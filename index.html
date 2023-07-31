@@ -30,21 +30,43 @@
 
       // WebXRのポリフィルを読み込み
       import WebXRPolyfill from "webxr-polyfill";
-      //コントローラa
+      //コントローラ
       import { XRControllerModelFactory } from 'https://unpkg.com/three@0.150.1/examples/jsm/webxr/XRControllerModelFactory.js';
       
-      //スコア変数
-      let score=1;
-      let scores=0;
+      //font
+      import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+      import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+      // フォントローダー
+const fontLoader = new FontLoader();
+
+// フォントを読み込む
+const font = await fontLoader.loadAsync("Sawarabi Mincho_Regular.json");
+
+// テキストメッシュ
+let scores = 0;
+let textMesh;
+let time;
+textMesh = new THREE.Mesh(
+  new TextGeometry(`残り:${scores}/100\n経過時間:${time}`, {
+    font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+    size: 10,   // 文字のサイズを指定
+    height: 1,  // 文字の厚さを指定
+  }),
+  new THREE.MeshBasicMaterial({
+    color: `#ccc`, // 文字の色
+  })
+);
+textMesh.position.set(-3.5, 2.5, -5);   // Meshの位置を設定
+textMesh.scale.set(0.05, 0.05, 0.05); // Meshの拡大縮小設定
+
+      
       //コントローラー
       let controller1, controller2;
       let controllerGrip1, controllerGrip2;
 
       // 秒数を表示するテキスト要素を取得
       const timeContainer = document.getElementById("timeContainer");
-      //時間60秒になったら停止するための変数
-      let shouldStopRendering = false;
-
+      
       // WebXRのポリフィルを有効にする
       const polyfill = new WebXRPolyfill();
 
@@ -73,6 +95,8 @@
       // シーンを作成
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x00bfff);
+      scene.add(textMesh); // Meshをシーンに追加
+
 
       // カメラを作成
       const camera = new THREE.PerspectiveCamera(0, width / height);
@@ -133,43 +157,93 @@
   const geo = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 )]);
   const line = new THREE.Line( geo );
   line.name = 'line';
-  line.scale.z = 5;
+  line.scale.z = 10;
   controller1.add( line.clone() );
   controller2.add( line.clone() );
   
 
   //機能
-	var coolTime = 0;
+	let coolTime = 0;
 	function handleController( controller ) {
 		const userData = controller.userData;
-		if ( userData.isSelecting === true ) {//コントローラーボタンが押された際の処理
-      if(coolTime===0){   //coolTimeが0なら処理を行う
-        const cube = createCube();
-        cube.position.set(0,1,-0.5);
-        scene.add(cube);
+    // レイキャスターを作成
+    const raycaster = new THREE.Raycaster();
+
+    // 光線の方向ベクトルを格納するVector3
+    const rayDirection = new THREE.Vector3();
+
+    // レイキャスターの原点（コントローラーの位置）を格納するVector3
+    const rayOrigin = new THREE.Vector3();
+  
+    // コントローラーの位置をrayOriginにセット
+    rayOrigin.setFromMatrixPosition(controller.matrixWorld);
+
+    // コントローラーの前方に向けて光線を伸ばす
+    controller.getWorldDirection(rayDirection);
+    rayDirection.normalize().multiplyScalar(5);
+    rayDirection.negate(); // 光線の方向を反転する
+    raycaster.set(rayOrigin, rayDirection);
+    // 光線とboxListとの交差をチェック
+
+    for(let i=0;i<boxList.length;i++){
+    const intersects = raycaster.intersectObject(boxList[i]);
+    // 交差した立方体を削除
+    if ( userData.isSelecting === true ) {//コントローラーボタンが押された際の処理
+      //if(coolTime===0){   //coolTimeが0なら処理を行う
+        if (intersects.length > 0) {
+          console.log(boxList[i]+"を消しました。");
+          scene.remove(boxList[i]);
+          scores+=1;
+          scene.add(textMesh); // Meshをシーンに追加
+          boxList.splice(i, 1); // i 番目の要素を削除
+          i--; // i の値を 1 減らす
+        }
+      //}
+    }
+  }
+  const line = controller.getObjectByName('line');
+    if (line) {
+      line.scale.z = rayDirection.length(); // 光線の長さを更新
+    }
+
+
+        
+
         // coolTimeを設ける。数値は0以外なら何でも良い。
         coolTime=1;
         setTimeout(function() {
           coolTime=0; // coolTimeを0にする処理
         }, 500); //coolTimeが0.5秒
-        setTimeout(function() {
-          //cubeを消す
-          scene.remove(cube);
-        }, 200);
+
+
+        function createBullet(controller) {
+        const bullet = new THREE.Mesh(new THREE.SphereGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+        bullet.userData.isBullet = true;
+        bullet.userData.controller = controller;
+        return bullet;
       }
-		} else {
-      
-		}
-	}
+
+      // 弾が発射された方向に移動する
+      THREE.Mesh.prototype.setDirection = function (controller) {
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        const controllerMatrix = new THREE.Matrix4();
+
+        controllerMatrix.fromArray(controller.matrix);
+        direction.set(0, 0, -1).applyMatrix4(controllerMatrix);
+        velocity.copy(direction).multiplyScalar(0.1);
+        this.userData.velocity = velocity;
+      };
+      }
   /* ----コントローラー設定----- */
   
   // 立方体を生成する関数
-  function createCube() {
-    const geometry = new THREE.BoxGeometry();
-    const material1 = new THREE.MeshBasicMaterial({ color: 'red' });//色を固定
-    const cube = new THREE.Mesh(geometry, material1);
-    return cube;
-  }
+  // function createCube() {
+  //   const geometry = new THREE.BoxGeometry();
+  //   const material1 = new THREE.MeshBasicMaterial({ color: 'red' });//色を固定
+  //   const cube = new THREE.Mesh(geometry, material1);
+  //   return cube;
+  // }
 
 
       // 地面を作成
@@ -228,19 +302,41 @@
   tick();
   handleController( controller1 );
 		handleController( controller2 );
-  if (!shouldStopRendering) {
-    updateTime();
-  }
 }
 
 // 初回のレンダリングループの開始
 renderer.setAnimationLoop(render);
 
-      let time = 0;
+      time = 0;
+      var bool=0;
+      var clearTime=0;
 
       // 毎フレーム時に実行されるループイベント
       function tick() {
+        
         time += 1;
+        scene.remove(textMesh);
+        if(scores<20){
+      // 既存のtextMeshを削除
+      
+
+      // textMeshを再生成してシーンに追加
+      textMesh = new THREE.Mesh(
+      new TextGeometry(`残り個数:${20-scores}個\n経過時間:${Math.ceil(time/60)}秒`, {
+        font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+        size: 10,   // 文字のサイズを指定
+        height: 1,  // 文字の厚さを指定
+      }),
+      new THREE.MeshBasicMaterial({
+        color: `#ccc`, // 文字の色
+      })
+);
+textMesh.position.set(-2.5, 2.5, -5);   // Meshの位置を設定
+textMesh.scale.set(0.05, 0.05, 0.05); // Meshの拡大縮小設定
+scene.add(textMesh); // Meshをシーンに追加
+
+        
+        
 
         // 立方体を動かす
         const length = boxList.length;  
@@ -256,17 +352,53 @@ renderer.setAnimationLoop(render);
           4 * Math.cos(time * 0.0175  + i/2);
           }
         }
+      }else{
+        if(bool===0){
+          for(var i=0; i<100; i++){
+            scene.remove(boxList[i]);
+          }
+          clearTime=Math.ceil(time/60);
+          bool=1
+          
+        }
+        textMesh = new THREE.Mesh(
+      new TextGeometry(`Game Clear!\n   Time:${clearTime}`, {
+        font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
+        size: 10,   // 文字のサイズを指定
+        height: 1,  // 文字の厚さを指定
+      }),
+      new THREE.MeshBasicMaterial({
+        color: `#ccc`, // 文字の色
+      })
+);
+textMesh.position.set(-3.5, 2.5, -5);   // Meshの位置を設定
+textMesh.scale.set(0.1, 0.1, 0.1); // Meshの拡大縮小設定
+scene.add(textMesh); // Meshをシーンに追加
+      }
 
     
         // レンダリング
         handleController( controller1 );
 	      handleController( controller2 );
         renderer.render(scene, camera);
+
+        boxList.forEach((bullet, index) => {
+          // 弾が設定された速度で移動する
+          if (bullet.userData.isBullet) {
+            bullet.position.add(bullet.userData.velocity);
+          }
+
+          // シーン外に出た弾を削除
+          if (bullet.position.length() > 10) {
+            scene.remove(bullet);
+            boxList.splice(index, 1);
+          }
+        });
          
       }
       // 毎フレームごとに秒数を更新して表示
       function updateTime() {
-      const seconds = Math.floor(time / 60); // 秒数を計算
+      
       timeContainer.textContent = "Time: " + seconds + " seconds";
       
 }
