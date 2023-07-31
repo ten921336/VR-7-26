@@ -47,7 +47,7 @@ let scores = 0;
 let textMesh;
 let time;
 textMesh = new THREE.Mesh(
-  new TextGeometry(`残り:${scores}/100\n経過時間:${time}`, {
+  new TextGeometry(`box:${scores}/20\n経過時間:${time}s`, {
     font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
     size: 10,   // 文字のサイズを指定
     height: 1,  // 文字の厚さを指定
@@ -163,7 +163,7 @@ textMesh.scale.set(0.05, 0.05, 0.05); // Meshの拡大縮小設定
   
 
   //機能
-	let coolTime = 0;
+	//let coolTime = 0;
 	function handleController( controller ) {
 		const userData = controller.userData;
     // レイキャスターを作成
@@ -210,10 +210,10 @@ textMesh.scale.set(0.05, 0.05, 0.05); // Meshの拡大縮小設定
         
 
         // coolTimeを設ける。数値は0以外なら何でも良い。
-        coolTime=1;
-        setTimeout(function() {
-          coolTime=0; // coolTimeを0にする処理
-        }, 500); //coolTimeが0.5秒
+        //coolTime=1;
+        //setTimeout(function() {
+          //coolTime=0; // coolTimeを0にする処理
+        //}, 500); //coolTimeが0.5秒
 
 
         function createBullet(controller) {
@@ -322,7 +322,7 @@ renderer.setAnimationLoop(render);
 
       // textMeshを再生成してシーンに追加
       textMesh = new THREE.Mesh(
-      new TextGeometry(`残り個数:${20-scores}個\n経過時間:${Math.ceil(time/60)}秒`, {
+      new TextGeometry(`box:${20-scores}/20\ntime:${Math.ceil(time/60)}s`, {
         font: font, // フォントを指定 (FontLoaderで読み込んだjson形式のフォント)
         size: 10,   // 文字のサイズを指定
         height: 1,  // 文字の厚さを指定
@@ -380,28 +380,8 @@ scene.add(textMesh); // Meshをシーンに追加
         // レンダリング
         handleController( controller1 );
 	      handleController( controller2 );
-        renderer.render(scene, camera);
-
-        boxList.forEach((bullet, index) => {
-          // 弾が設定された速度で移動する
-          if (bullet.userData.isBullet) {
-            bullet.position.add(bullet.userData.velocity);
-          }
-
-          // シーン外に出た弾を削除
-          if (bullet.position.length() > 10) {
-            scene.remove(bullet);
-            boxList.splice(index, 1);
-          }
-        });
-         
+        renderer.render(scene, camera); 
       }
-      // 毎フレームごとに秒数を更新して表示
-      function updateTime() {
-      
-      timeContainer.textContent = "Time: " + seconds + " seconds";
-      
-}
       	
       // リサイズ処理
       window.addEventListener("resize", onResize);
